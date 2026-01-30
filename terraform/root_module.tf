@@ -18,7 +18,8 @@ module "subnets_module" {
   env             = var.env
   azs             = var.azs
   public_subnets  = var.public_subnets
-  private_subnets = var.private_subnets
+  presentation_subnets = var.presentation_subnets
+  database_subnets = var.database_subnets
 }
 
 
