@@ -50,4 +50,38 @@ variable "azs" {
   type        = list(string)
 }
 
+variable "eks_cluster_name" {
+  description = "Name of the EKS cluster"
+  type        = string
+}
 
+variable "eks_cluster_version" {
+  description = "Version of the EKS cluster"
+  type        = string
+}
+
+
+variable "desired_capacity" {
+  description = "Desired number of nodes in the EKS node group"
+  type        = number
+}
+
+variable "max_capacity" {
+  description = "Maximum number of nodes in the EKS node group"
+  type        = number
+}
+
+variable "min_capacity" {
+  description = "Minimum number of nodes in the EKS node group"
+  type        = number
+}
+
+variable "instance_types" {
+  description = "List of instance types for the EKS node group"
+  type        = list(string)
+}
+
+variable "public_key_path" {
+  description = "Path to the public key file"
+  type        = string
+}

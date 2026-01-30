@@ -27,7 +27,7 @@ module "subnets_module" {
   azs                  = var.azs
   public_subnets       = var.public_subnets
   presentation_subnets = var.presentation_subnets
-  backend_subnets     = var.backend_subnets
+  backend_subnets      = var.backend_subnets
 }
 
 
@@ -40,8 +40,23 @@ module "public_route_table_module" {
   env                     = var.env
   public_subnets_id       = module.subnets_module.public_subnets_id
   presentation_subnets_id = module.subnets_module.presentation_subnets_id
-  backend_subnets_id     = module.subnets_module.backend_subnets_id
+  backend_subnets_id      = module.subnets_module.backend_subnets_id
   nat_id                  = module.nat_module.nat_id
 }
 
-  
+
+module "eks_module" {
+  source = "./modules/eks_module"
+
+  eks_cluster_name    = var.eks_cluster_name
+  eks_cluster_version = var.eks_cluster_version
+  subnet_ids = flatten([
+    module.subnets_module.presentation_subnets_id,
+    module.subnets_module.backend_subnets_id
+  ])
+  env              = var.env
+  desired_capacity = var.desired_capacity
+  max_capacity     = var.max_capacity
+  min_capacity     = var.min_capacity
+  instance_types   = var.instance_types
+}
