@@ -3,6 +3,7 @@ resource "aws_subnet" "public_subnets" {
   cidr_block = var.public_subnets[count.index]
   availability_zone = var.azs[count.index]
   count = length(var.public_subnets)
+  map_public_ip_on_launch = true
 
   tags = {  
         Name = "public-${var.env}-${count.index + 1}"
