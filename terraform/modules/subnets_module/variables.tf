@@ -22,7 +22,7 @@ variable "presentation_subnets" {
   type        = list(string)
 }
 
-variable "database_subnets" {
+variable "backend_subnets" {
   description = "Database subnet CIDRs"
   type        = list(string)
 }

@@ -6,6 +6,6 @@ output "presentation_subnets_id" {
   value = aws_subnet.presentation_subnets[*].id
 }
 
-output "database_subnets_id" {
-  value = aws_subnet.database_subnets[*].id
+output "backend_subnets_id" {
+  value = aws_subnet.backend_subnets[*].id
 }

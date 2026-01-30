@@ -21,14 +21,14 @@ resource "aws_subnet" "presentation_subnets" {
   }
 }
 
-resource "aws_subnet" "database_subnets" {
+resource "aws_subnet" "backend_subnets" {
   vpc_id     = var.vpc_id
-  cidr_block = var.database_subnets[count.index]
+  cidr_block = var.backend_subnets[count.index]
   availability_zone = var.azs[count.index]
-  count = length(var.database_subnets)
+  count = length(var.backend_subnets)
 
   tags = {
-        Name = "database-${var.env}-${count.index + 1}"
+        Name = "backend-${var.env}-${count.index + 1}"
   }
 }
 
