@@ -39,7 +39,7 @@ resource "aws_route_table_association" "presentation_route_table_association" {
   route_table_id = aws_route_table.private_route_table.id
 }
 
-resource "aws_route_table_association" "database_route_table_association" {
+resource "aws_route_table_association" "backend_route_table_association" {
   count = length(var.backend_subnets_id)
   subnet_id = var.backend_subnets_id[count.index]
   route_table_id = aws_route_table.private_route_table.id
