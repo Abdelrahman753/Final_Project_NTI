@@ -7,6 +7,14 @@ parameters:
   - nonprod
   - prod
 
+- name: action
+  displayName: "Choose Action"
+  type: string
+  default: apply
+  values:
+  - apply
+  - destroy
+
 trigger:
 - main
 
@@ -15,10 +23,11 @@ pool:
 
 variables:
   TF_ENV: ${{ parameters.environment }}
+  TF_ACTION: ${{ parameters.action }}
 
 jobs:
-- job: terraform_apply
-  displayName: "Terraform Init, Plan & Apply"
+- job: terraform
+  displayName: "Terraform Init, Plan & Apply/Destroy"
   steps:
   - checkout: self
 
@@ -37,7 +46,8 @@ jobs:
       AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
 
   - task: TerraformCLI@1
-    displayName: "Terraform Plan"
+    displayName: "Terraform Plan (apply)"
+    condition: eq(variables['TF_ACTION'], 'apply')
     inputs:
       command: 'plan'
       workingDirectory: 'terraform'
@@ -51,11 +61,40 @@ jobs:
 
   - task: TerraformCLI@1
     displayName: "Terraform Apply"
+    condition: eq(variables['TF_ACTION'], 'apply')
     inputs:
       command: 'apply'
       workingDirectory: 'terraform'
       commandOptions: >
         -auto-approve tfplan
+    env:
+      AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+      AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+      AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+
+  - task: TerraformCLI@1
+    displayName: "Terraform Plan (destroy)"
+    condition: eq(variables['TF_ACTION'], 'destroy')
+    inputs:
+      command: 'plan'
+      workingDirectory: 'terraform'
+      commandOptions: >
+        -destroy
+        -var-file="$(System.DefaultWorkingDirectory)/terraform/$(TF_ENV)/$(TF_ENV).tfvars"
+        -out=tfdestroyplan
+    env:
+      AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+      AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+      AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+
+  - task: TerraformCLI@1
+    displayName: "Terraform Destroy (apply destroy plan)"
+    condition: eq(variables['TF_ACTION'], 'destroy')
+    inputs:
+      command: 'apply'
+      workingDirectory: 'terraform'
+      commandOptions: >
+        -auto-approve tfdestroyplan
     env:
       AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
       AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
