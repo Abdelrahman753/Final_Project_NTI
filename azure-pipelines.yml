@@ -1,0 +1,62 @@
+parameters:
+- name: environment
+  displayName: "Choose Environment"
+  type: string
+  default: nonprod
+  values:
+  - nonprod
+  - prod
+
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  TF_ENV: ${{ parameters.environment }}
+
+jobs:
+- job: terraform_apply
+  displayName: "Terraform Init, Plan & Apply"
+  steps:
+  - checkout: self
+
+  - task: TerraformInstaller@1
+    inputs:
+      terraformVersion: 'latest'
+
+  - task: TerraformCLI@1
+    displayName: "Terraform Init"
+    inputs:
+      command: 'init'
+      workingDirectory: 'terraform'
+    env:
+      AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+      AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+      AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+
+  - task: TerraformCLI@1
+    displayName: "Terraform Plan"
+    inputs:
+      command: 'plan'
+      workingDirectory: 'terraform'
+      commandOptions: >
+        -var-file="$(System.DefaultWorkingDirectory)/terraform/$(TF_ENV)/$(TF_ENV).tfvars"
+        -out=tfplan
+    env:
+      AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+      AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+      AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+
+  - task: TerraformCLI@1
+    displayName: "Terraform Apply"
+    inputs:
+      command: 'apply'
+      workingDirectory: 'terraform'
+      commandOptions: >
+        -auto-approve tfplan
+    env:
+      AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+      AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+      AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
