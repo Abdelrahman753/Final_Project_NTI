@@ -20,15 +20,6 @@ variable "vpc_cidr_block" {
   type        = string
 }
 
-variable "access_key" {
-  description = "AWS access key"
-  type        = string
-}
-
-variable "secret_key" {
-  description = "AWS secret key"
-  type        = string
-}
 
 variable "public_subnets" {
   description = "Public subnet CIDRs"
