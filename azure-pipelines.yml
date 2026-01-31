@@ -26,76 +26,99 @@ variables:
   TF_ACTION: ${{ parameters.action }}
 
 jobs:
-- job: terraform
-  displayName: "Terraform Init, Plan & Apply/Destroy"
+- job: terraform_plan
+  displayName: "Terraform Init & Plan"
   steps:
-  - checkout: self
+    - checkout: self
 
-  - task: TerraformInstaller@1
-    inputs:
-      terraformVersion: 'latest'
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: 'latest'
 
-  - task: TerraformCLI@1
-    displayName: "Terraform Init"
-    inputs:
-      command: 'init'
-      workingDirectory: 'terraform'
-    env:
-      AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
-      AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-      AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+    - task: TerraformCLI@1
+      displayName: "Terraform Init"
+      inputs:
+        command: 'init'
+        workingDirectory: 'terraform'
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
 
-  - task: TerraformCLI@1
-    displayName: "Terraform Plan (apply)"
-    condition: eq(variables['TF_ACTION'], 'apply')
-    inputs:
-      command: 'plan'
-      workingDirectory: 'terraform'
-      commandOptions: >
-        -var-file="$(System.DefaultWorkingDirectory)/terraform/$(TF_ENV)/$(TF_ENV).tfvars"
-        -out=tfplan
-    env:
-      AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
-      AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-      AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+    # Apply Plan
+    - task: TerraformCLI@1
+      displayName: "Terraform Plan (Apply)"
+      condition: eq(variables['TF_ACTION'], 'apply')
+      inputs:
+        command: 'plan'
+        workingDirectory: 'terraform'
+        commandOptions: >
+          -var-file="$(System.DefaultWorkingDirectory)/terraform/$(TF_ENV)/$(TF_ENV).tfvars"
+          -out=tfplan
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
 
-  - task: TerraformCLI@1
-    displayName: "Terraform Apply"
-    condition: eq(variables['TF_ACTION'], 'apply')
-    inputs:
-      command: 'apply'
-      workingDirectory: 'terraform'
-      commandOptions: >
-        -auto-approve tfplan
-    env:
-      AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
-      AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-      AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+    # Destroy Plan
+    - task: TerraformCLI@1
+      displayName: "Terraform Plan (Destroy)"
+      condition: eq(variables['TF_ACTION'], 'destroy')
+      inputs:
+        command: 'plan'
+        workingDirectory: 'terraform'
+        commandOptions: >
+          -destroy
+          -var-file="$(System.DefaultWorkingDirectory)/terraform/$(TF_ENV)/$(TF_ENV).tfvars"
+          -out=tfdestroyplan
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
 
-  - task: TerraformCLI@1
-    displayName: "Terraform Plan (destroy)"
-    condition: eq(variables['TF_ACTION'], 'destroy')
-    inputs:
-      command: 'plan'
-      workingDirectory: 'terraform'
-      commandOptions: >
-        -destroy
-        -var-file="$(System.DefaultWorkingDirectory)/terraform/$(TF_ENV)/$(TF_ENV).tfvars"
-        -out=tfdestroyplan
-    env:
-      AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
-      AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-      AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+- job: approval
+  displayName: "Manual Approval Before Apply / Destroy"
+  dependsOn: terraform_plan
+  pool: server
+  steps:
+    - task: ManualValidation@0
+      inputs:
+        notifyUsers: |
+          abdelrahman.m.27.22@gmail.com
+        instructions: |
+          Please review the Terraform plan carefully.
+          This action will APPLY or DESTROY infrastructure.
+        onTimeout: 'reject'
+      timeoutInMinutes: 60
 
-  - task: TerraformCLI@1
-    displayName: "Terraform Destroy (apply destroy plan)"
-    condition: eq(variables['TF_ACTION'], 'destroy')
-    inputs:
-      command: 'apply'
-      workingDirectory: 'terraform'
-      commandOptions: >
-        -auto-approve tfdestroyplan
-    env:
-      AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
-      AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-      AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+- job: terraform_apply_destroy
+  displayName: "Terraform Apply / Destroy"
+  dependsOn: approval
+  steps:
+    - checkout: self
+
+    - task: TerraformCLI@1
+      displayName: "Terraform Apply"
+      condition: eq(variables['TF_ACTION'], 'apply')
+      inputs:
+        command: 'apply'
+        workingDirectory: 'terraform'
+        commandOptions: >
+          -auto-approve tfplan
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+
+    - task: TerraformCLI@1
+      displayName: "Terraform Destroy"
+      condition: eq(variables['TF_ACTION'], 'destroy')
+      inputs:
+        command: 'apply'
+        workingDirectory: 'terraform'
+        commandOptions: >
+          -auto-approve tfdestroyplan
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
