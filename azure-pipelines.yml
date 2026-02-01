@@ -96,7 +96,7 @@ stages:
       condition: eq(variables['TF_ACTION'], 'destroy')
       inputs:
         targetPath: 'terraform/tfdestroyplan'
-        artifact: 'tfdestroyplan'
+        artifact: 'tfplan'
         publishLocation: 'pipeline'
 
 
