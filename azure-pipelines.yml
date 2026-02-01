@@ -83,6 +83,13 @@ stages:
         AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
 
 
+    - task: PublishPipelineArtifact@1
+      displayName: "Publish plan artifact"
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/tfplan'
+        artifact: 'tfplan'
+        publishLocation: 'pipeline'
+
 
 # =========================
 # STAGE 2: APPROVAL + APPLY/DESTROY
