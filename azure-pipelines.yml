@@ -33,7 +33,7 @@ stages:
   - job: terraform_plan
     displayName: "Init + Plan"
     pool:
-      vmImage: ubuntu-latest
+      name: default
 
     steps:
     - checkout: self
@@ -113,7 +113,7 @@ stages:
     displayName: "Terraform Apply/Destroy (gated by Environment approvals)"
     environment: terraform-${{ parameters.environment }}
     pool:
-      vmImage: ubuntu-latest
+      name: default
 
     strategy:
       runOnce:
