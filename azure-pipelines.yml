@@ -84,10 +84,19 @@ stages:
 
 
     - task: PublishPipelineArtifact@1
-      displayName: "Publish plan artifact"
+      displayName: "Publish apply plan"
+      condition: eq(variables['TF_ACTION'], 'apply')
       inputs:
-        targetPath: '$(Build.ArtifactStagingDirectory)/tfplan'
+        targetPath: 'terraform/tfplan'
         artifact: 'tfplan'
+        publishLocation: 'pipeline'
+
+    - task: PublishPipelineArtifact@1
+      displayName: "Publish destroy plan"
+      condition: eq(variables['TF_ACTION'], 'destroy')
+      inputs:
+        targetPath: 'terraform/tfdestroyplan'
+        artifact: 'tfdestroyplan'
         publishLocation: 'pipeline'
 
 
