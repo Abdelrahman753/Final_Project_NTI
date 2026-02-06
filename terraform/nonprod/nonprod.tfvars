@@ -9,7 +9,15 @@ backend_subnets = ["10.0.30.0/24", "10.0.40.0/24"]
 azs = ["us-east-1a", "us-east-1b"]
 eks_cluster_name = "nonprod-eks-cluster"
 eks_cluster_version = "1.29"
-desired_capacity = 2
-max_capacity = 4
+desired_capacity = 10
+max_capacity = 12
 min_capacity = 1
 instance_types = ["t2.micro"]
+nlb_name = "nonprod-nlb"
+listener_port = 80
+api_name = "nonprod-api-gateway"
+vpc_link_name = "nonprod-vpc-link"
+tags = {
+  Environment = "nonprod"
+  Project     = "Final-Project"
+}
