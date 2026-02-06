@@ -164,3 +164,158 @@ stages:
               AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
               AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
               AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+
+# =========================
+# STAGE 3: HELM INSTALL
+# =========================
+- stage: Helm_Install
+  displayName: "Helm Install (aws-lbc + ingress-nginx + TGB)"
+  dependsOn: Apply
+  condition: and(succeeded(), eq(variables['TF_ACTION'], 'apply'))
+
+  jobs:
+  - job: helm_install
+    displayName: "Install Controllers + Binding"
+    pool:
+      name: default
+
+    steps:
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: '$(TF_VERSION)'
+
+    - task: TerraformCLI@1
+      displayName: "Terraform Init (for outputs)"
+      inputs:
+        command: 'init'
+        workingDirectory: 'terraform'
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+
+    # -------------------------
+    # Export Terraform outputs to pipeline variables
+    # -------------------------
+    - task: Bash@3
+      displayName: "Read Terraform outputs (cluster name + TG ARN + API)"
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -e
+          cd terraform
+
+          CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
+          TG_ARN=$(terraform output -raw nlb_target_group_arn)
+          API_ENDPOINT=$(terraform output -raw api_endpoint || true)
+
+          echo "Cluster: $CLUSTER_NAME"
+          echo "TG ARN:   $TG_ARN"
+          echo "API:      $API_ENDPOINT"
+
+          echo "##vso[task.setvariable variable=EKS_CLUSTER_NAME]$CLUSTER_NAME"
+          echo "##vso[task.setvariable variable=NLB_TG_ARN]$TG_ARN"
+          echo "##vso[task.setvariable variable=API_ENDPOINT]$API_ENDPOINT"
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+
+    # -------------------------
+    # kubeconfig
+    # -------------------------
+    - task: Bash@3
+      displayName: "Configure kubeconfig for EKS"
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -e
+          aws eks update-kubeconfig \
+            --name "$(EKS_CLUSTER_NAME)" \
+            --region "$(AWS_DEFAULT_REGION)"
+
+          kubectl get nodes -o wide
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+
+    # -------------------------
+    # Install AWS Load Balancer Controller
+    # Assumes Terraform created the ServiceAccount with IRSA:
+    # kube-system/aws-load-balancer-controller
+    # -------------------------
+    - task: Bash@3
+      displayName: "Install aws-load-balancer-controller (Helm)"
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -e
+
+          helm repo add eks https://aws.github.io/eks-charts
+          helm repo update
+
+          kubectl -n kube-system get sa aws-load-balancer-controller
+
+          helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+            -n kube-system \
+            --set clusterName="$(EKS_CLUSTER_NAME)" \
+            --set serviceAccount.create=false \
+            --set serviceAccount.name=aws-load-balancer-controller \
+            --wait --timeout 10m
+
+          kubectl -n kube-system get deploy aws-load-balancer-controller
+          kubectl get crd | grep targetgroupbindings || true
+
+    # -------------------------
+    # Install ingress-nginx
+    # -------------------------
+    - task: Bash@3
+      displayName: "Install ingress-nginx (Helm)"
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -e
+
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo update
+
+          helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+            -n ingress-nginx --create-namespace \
+            --set controller.service.type=ClusterIP \
+            --wait --timeout 10m
+
+          kubectl -n ingress-nginx get svc ingress-nginx-controller
+
+    # -------------------------
+    # Apply TargetGroupBinding
+    # -------------------------
+    - task: Bash@3
+      displayName: "Apply TargetGroupBinding (NLB TG -> ingress-nginx svc)"
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -e
+
+          cat > tgb.yaml <<EOF
+          apiVersion: elbv2.k8s.aws/v1beta1
+          kind: TargetGroupBinding
+          metadata:
+            name: ingress-nlb-tgb
+            namespace: ingress-nginx
+          spec:
+            targetGroupARN: $(NLB_TG_ARN)
+            targetType: ip
+            serviceRef:
+              name: ingress-nginx-controller
+              port: 80
+          EOF
+
+          kubectl apply -f tgb.yaml
+
+          kubectl -n ingress-nginx get targetgroupbinding ingress-nlb-tgb -o wide
+          kubectl -n ingress-nginx describe targetgroupbinding ingress-nlb-tgb | sed -n '/Events/,$p'
+
+ 
