@@ -72,3 +72,28 @@ variable "instance_types" {
   type        = list(string)
 }
 
+
+variable "nlb_name" {
+  description = "nlb name"
+}
+
+
+
+variable "api_name" {
+  description = "Name of the API Gateway"
+  type        = string
+}
+
+variable "listener_port" {
+  description = "Port for the NLB listener"
+  type        = number
+}
+
+variable "vpc_link_name" {
+  description = "Name of the VPC link"
+  type        = string
+}
+variable "tags" {
+  description = "Tags to be applied to all resources"
+  type        = map(string)
+}
