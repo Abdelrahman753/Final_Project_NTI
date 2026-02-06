@@ -36,5 +36,12 @@ variable "instance_types" {
   description = "List of instance types for the EKS node group"
   type        = list(string)
 }
+variable "tags" {
+  description = "Tags to be applied to EKS resources"
+  type        = map(string)
+}
 
-
+variable "nodes_sg_id" {
+  description = "The security group ID for EKS worker nodes"
+  type        = string
+}
