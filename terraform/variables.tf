@@ -97,3 +97,8 @@ variable "tags" {
   description = "Tags to be applied to all resources"
   type        = map(string)
 }
+
+variable "ssh_key_name" {
+  description = "The name of the SSH key pair for EKS worker nodes"
+  type        = string
+}

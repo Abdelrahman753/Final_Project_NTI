@@ -9,7 +9,7 @@ backend_subnets = ["10.0.30.0/24", "10.0.40.0/24"]
 azs = ["us-east-1a", "us-east-1b"]
 eks_cluster_name = "nonprod-eks-cluster"
 eks_cluster_version = "1.29"
-desired_capacity = 10
+desired_capacity = 6
 max_capacity = 12
 min_capacity = 1
 instance_types = ["t2.micro"]
@@ -21,3 +21,5 @@ tags = {
   Environment = "nonprod"
   Project     = "Final-Project"
 }
+
+ssh_key_name = "worker-key"

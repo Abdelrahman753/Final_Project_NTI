@@ -68,6 +68,7 @@ module "eks_module" {
   max_capacity     = var.max_capacity
   min_capacity     = var.min_capacity
   instance_types   = var.instance_types
+  ssh_key_name     = var.ssh_key_name
 }
 
 
