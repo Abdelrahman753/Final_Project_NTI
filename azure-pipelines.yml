@@ -33,7 +33,7 @@ stages:
   - job: terraform_plan
     displayName: "Init + Plan"
     pool:
-      name: Default
+      name: abdo-shahin
 
 
 
@@ -115,7 +115,7 @@ stages:
     displayName: "Terraform Apply/Destroy (gated by Environment approvals)"
     environment: terraform-${{ parameters.environment }}
     pool:
-      name: Default
+      name: abdo-shahin
 
     strategy:
       runOnce:
@@ -179,7 +179,7 @@ stages:
   - job: helm_install
     displayName: "Install Controllers + Binding"
     pool:
-      name: Default
+      name: abdo-shahin
 
     steps:
     - checkout: self
@@ -287,6 +287,10 @@ stages:
 
           kubectl -n kube-system get deploy aws-load-balancer-controller
           kubectl get crd | grep targetgroupbindings || true
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
 
     # -------------------------
     # Install ingress-nginx
@@ -307,6 +311,10 @@ stages:
             --wait --timeout 10m
 
           kubectl -n ingress-nginx get svc ingress-nginx-controller
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
 
     # -------------------------
     # Apply TargetGroupBinding
@@ -336,6 +344,10 @@ stages:
 
           kubectl -n ingress-nginx get targetgroupbinding ingress-nlb-tgb -o wide
           kubectl -n ingress-nginx describe targetgroupbinding ingress-nlb-tgb | sed -n '/Events/,$p'
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
 
           
 
