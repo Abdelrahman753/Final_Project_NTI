@@ -206,20 +206,31 @@ stages:
       inputs:
         targetType: 'inline'
         script: |
-          set -e
-          cd terraform
+         set -euo pipefail
+         cd terraform
+   
+         CLUSTER_NAME="$(terraform output -raw eks_cluster_name)"
+         TG_ARN="$(terraform output -raw nlb_target_group_arn)"
+         API_ENDPOINT="$(terraform output -raw api_endpoint 2>/dev/null || true)"
+   
+         echo "Cluster: ${CLUSTER_NAME}"
+         echo "TG ARN:  ${TG_ARN}"
+         echo "API:     ${API_ENDPOINT}"
+   
+         if [ -z "${CLUSTER_NAME}" ]; then
+           echo "ERROR: eks_cluster_name output is empty"
+           exit 1
+         fi
+   
+         if [ -z "${TG_ARN}" ]; then
+           echo "ERROR: nlb_target_group_arn output is empty"
+           exit 1
+         fi
+   
+         echo "##vso[task.setvariable variable=EKS_CLUSTER_NAME]${CLUSTER_NAME}"
+         echo "##vso[task.setvariable variable=NLB_TG_ARN]${TG_ARN}"
+         echo "##vso[task.setvariable variable=API_ENDPOINT]${API_ENDPOINT}"
 
-          CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
-          TG_ARN=$(terraform output -raw nlb_target_group_arn)
-          API_EDNPOINT=$(terraform output -raw api_endpoint || true)
-
-          echo "Cluster: $CLUSTER_NAME"
-          echo "TG ARN:   $TG_ARN"
-          echo "API:      $API_ENDPOINT"
-
-          echo "##vso[task.setvariable variable=EKS_CLUSTER_NAME]$CLUSTER_NAME"
-          echo "##vso[task.setvariable variable=NLB_TG_ARN]$TG_ARN"
-          echo "##vso[task.setvariable variable=API_ENDPOINT]$API_ENDPOINT"
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
@@ -233,12 +244,14 @@ stages:
       inputs:
         targetType: 'inline'
         script: |
-          set -e
-          aws eks update-kubeconfig \
-            --name "$(EKS_CLUSTER_NAME)" \
-            --region "$(AWS_DEFAULT_REGION)"
-
-          kubectl get nodes -o wide
+         set -euo pipefail
+         echo "Using cluster: '$(EKS_CLUSTER_NAME)' region: '$(AWS_DEFAULT_REGION)'"
+   
+         aws eks update-kubeconfig \
+           --name "$(EKS_CLUSTER_NAME)" \
+           --region "$(AWS_DEFAULT_REGION)"
+   
+         kubectl get nodes -o wide
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
@@ -319,5 +332,7 @@ stages:
 
           kubectl -n ingress-nginx get targetgroupbinding ingress-nlb-tgb -o wide
           kubectl -n ingress-nginx describe targetgroupbinding ingress-nlb-tgb | sed -n '/Events/,$p'
+
+          
 
  
