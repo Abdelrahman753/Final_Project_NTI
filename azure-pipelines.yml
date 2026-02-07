@@ -209,31 +209,41 @@ stages:
         script: |
           set -euo pipefail
           cd terraform
-
-
+          
           terraform output -json > /tmp/tfouts.json
-
+          
+          # ===== existing outputs =====
           CLUSTER_NAME="$(jq -r '.eks_cluster_name.value // empty' /tmp/tfouts.json)"
           TG_ARN="$(jq -r '.nlb_target_group_arn.value // empty' /tmp/tfouts.json)"
           API_ENDPOINT="$(jq -r '.api_endpoint.value // empty' /tmp/tfouts.json)"
-
+          
+          # ===== NEW: IRSA role for AWS LBC =====
+          LBC_ROLE_ARN="$(jq -r '.alb_controller_irsa_role_arn.value // empty' /tmp/tfouts.json)"
+          
           echo "Cluster: ${CLUSTER_NAME}"
           echo "TG ARN:  ${TG_ARN}"
           echo "API:     ${API_ENDPOINT}"
-
-          if [ -z "${CLUSTER_NAME}" ] || [ "${CLUSTER_NAME}" = "null" ]; then
+          echo "LBC Role ARN: ${LBC_ROLE_ARN}"
+          
+          if [ -z "${CLUSTER_NAME}" ]; then
             echo "ERROR: eks_cluster_name output missing"
             exit 1
           fi
-
-          if [ -z "${TG_ARN}" ] || [ "${TG_ARN}" = "null" ]; then
+          
+          if [ -z "${TG_ARN}" ]; then
             echo "ERROR: nlb_target_group_arn output missing"
             exit 1
           fi
-
+          
+          if [ -z "${LBC_ROLE_ARN}" ]; then
+            echo "ERROR: alb_controller_irsa_role_arn output missing"
+            exit 1
+          fi
+          
           echo "##vso[task.setvariable variable=EKS_CLUSTER_NAME]${CLUSTER_NAME}"
           echo "##vso[task.setvariable variable=NLB_TG_ARN]${TG_ARN}"
           echo "##vso[task.setvariable variable=API_ENDPOINT]${API_ENDPOINT}"
+          echo "##vso[task.setvariable variable=LBC_ROLE_ARN]${LBC_ROLE_ARN}"
       env:
         TF_ENV: $(TF_ENV)
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
