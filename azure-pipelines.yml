@@ -33,7 +33,7 @@ stages:
   - job: terraform_plan
     displayName: "Init + Plan"
     pool:
-      name: default
+      name: Default
 
 
 
@@ -115,7 +115,7 @@ stages:
     displayName: "Terraform Apply/Destroy (gated by Environment approvals)"
     environment: terraform-${{ parameters.environment }}
     pool:
-      name: default
+      name: Default
 
     strategy:
       runOnce:
@@ -179,7 +179,7 @@ stages:
   - job: helm_install
     displayName: "Install Controllers + Binding"
     pool:
-      name: default
+      name: Default
 
     steps:
     - checkout: self
