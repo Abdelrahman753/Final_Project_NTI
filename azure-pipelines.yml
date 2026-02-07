@@ -193,6 +193,7 @@ stages:
       inputs:
         command: 'init'
         workingDirectory: 'terraform'
+        commandOptions: '-reconfigure'
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
@@ -206,32 +207,35 @@ stages:
       inputs:
         targetType: 'inline'
         script: |
-         set -euo pipefail
-         cd terraform
-   
-         terraform output >/dev/null
-   
-         CLUSTER_NAME="$(terraform output -raw eks_cluster_name | tr -d '\r\n')"
-         TG_ARN="$(terraform output -raw nlb_target_group_arn | tr -d '\r\n')"
-   
-         API_ENDPOINT="$(terraform output -raw api_endpoint 2>/dev/null | tr -d '\r\n' || true)"
-   
-         echo "Cluster: ${CLUSTER_NAME}"
-         echo "TG ARN:  ${TG_ARN}"
-         echo "API:     ${API_ENDPOINT}"
-   
-         if ! echo "${CLUSTER_NAME}" | grep -Eq '^[0-9A-Za-z][A-Za-z0-9-_]*$'; then
-           echo "ERROR: Invalid cluster name from terraform output: '${CLUSTER_NAME}'"
-           echo "INFO: Available outputs:"
-           terraform output
-           exit 1
-         fi
-   
-         echo "##vso[task.setvariable variable=EKS_CLUSTER_NAME]${CLUSTER_NAME}"
-         echo "##vso[task.setvariable variable=NLB_TG_ARN]${TG_ARN}"
-         echo "##vso[task.setvariable variable=API_ENDPOINT]${API_ENDPOINT}"
+          set -euo pipefail
+          cd terraform
 
+
+          terraform output -json > /tmp/tfouts.json
+
+          CLUSTER_NAME="$(jq -r '.eks_cluster_name.value // empty' /tmp/tfouts.json)"
+          TG_ARN="$(jq -r '.nlb_target_group_arn.value // empty' /tmp/tfouts.json)"
+          API_ENDPOINT="$(jq -r '.api_endpoint.value // empty' /tmp/tfouts.json)"
+
+          echo "Cluster: ${CLUSTER_NAME}"
+          echo "TG ARN:  ${TG_ARN}"
+          echo "API:     ${API_ENDPOINT}"
+
+          if [ -z "${CLUSTER_NAME}" ] || [ "${CLUSTER_NAME}" = "null" ]; then
+            echo "ERROR: eks_cluster_name output missing"
+            exit 1
+          fi
+
+          if [ -z "${TG_ARN}" ] || [ "${TG_ARN}" = "null" ]; then
+            echo "ERROR: nlb_target_group_arn output missing"
+            exit 1
+          fi
+
+          echo "##vso[task.setvariable variable=EKS_CLUSTER_NAME]${CLUSTER_NAME}"
+          echo "##vso[task.setvariable variable=NLB_TG_ARN]${TG_ARN}"
+          echo "##vso[task.setvariable variable=API_ENDPOINT]${API_ENDPOINT}"
       env:
+        TF_ENV: $(TF_ENV)
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
         AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
@@ -248,7 +252,7 @@ stages:
          echo "Using cluster: '$(EKS_CLUSTER_NAME)' region: '$(AWS_DEFAULT_REGION)'"
    
          aws eks update-kubeconfig \
-           --name "$(EKS_CLUSTER_NAME)" 
+           --name "$(EKS_CLUSTER_NAME)" \
            --region "$(AWS_DEFAULT_REGION)"
    
          kubectl get nodes -o wide
