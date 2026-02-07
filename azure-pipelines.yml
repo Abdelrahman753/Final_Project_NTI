@@ -35,6 +35,8 @@ stages:
     pool:
       name: default
 
+
+
     steps:
     - checkout: self
 
@@ -209,7 +211,7 @@ stages:
 
           CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
           TG_ARN=$(terraform output -raw nlb_target_group_arn)
-          API_ENDPOINT=$(terraform output -raw api_endpoint || true)
+          API_EDNPOINT=$(terraform output -raw api_endpoint || true)
 
           echo "Cluster: $CLUSTER_NAME"
           echo "TG ARN:   $TG_ARN"
