@@ -209,21 +209,21 @@ stages:
          set -euo pipefail
          cd terraform
    
-         CLUSTER_NAME="$(terraform output -raw eks_cluster_name)"
-         TG_ARN="$(terraform output -raw nlb_target_group_arn)"
-         API_ENDPOINT="$(terraform output -raw api_endpoint 2>/dev/null || true)"
+         terraform output >/dev/null
+   
+         CLUSTER_NAME="$(terraform output -raw eks_cluster_name | tr -d '\r\n')"
+         TG_ARN="$(terraform output -raw nlb_target_group_arn | tr -d '\r\n')"
+   
+         API_ENDPOINT="$(terraform output -raw api_endpoint 2>/dev/null | tr -d '\r\n' || true)"
    
          echo "Cluster: ${CLUSTER_NAME}"
          echo "TG ARN:  ${TG_ARN}"
          echo "API:     ${API_ENDPOINT}"
    
-         if [ -z "${CLUSTER_NAME}" ]; then
-           echo "ERROR: eks_cluster_name output is empty"
-           exit 1
-         fi
-   
-         if [ -z "${TG_ARN}" ]; then
-           echo "ERROR: nlb_target_group_arn output is empty"
+         if ! echo "${CLUSTER_NAME}" | grep -Eq '^[0-9A-Za-z][A-Za-z0-9-_]*$'; then
+           echo "ERROR: Invalid cluster name from terraform output: '${CLUSTER_NAME}'"
+           echo "INFO: Available outputs:"
+           terraform output
            exit 1
          fi
    
@@ -248,7 +248,7 @@ stages:
          echo "Using cluster: '$(EKS_CLUSTER_NAME)' region: '$(AWS_DEFAULT_REGION)'"
    
          aws eks update-kubeconfig \
-           --name "$(EKS_CLUSTER_NAME)" \
+           --name "$(EKS_CLUSTER_NAME)" 
            --region "$(AWS_DEFAULT_REGION)"
    
          kubectl get nodes -o wide
