@@ -33,7 +33,7 @@ stages:
   - job: terraform_plan
     displayName: "Init + Plan"
     pool:
-      name: abdo-shahin
+      name: Default
 
 
 
@@ -115,7 +115,7 @@ stages:
     displayName: "Terraform Apply/Destroy (gated by Environment approvals)"
     environment: terraform-${{ parameters.environment }}
     pool:
-      name: abdo-shahin
+      name: Default
 
     strategy:
       runOnce:
@@ -179,7 +179,7 @@ stages:
   - job: helm_install
     displayName: "Install Controllers + Binding"
     pool:
-      name: abdo-shahin
+      name: Default
 
     steps:
     - checkout: self
