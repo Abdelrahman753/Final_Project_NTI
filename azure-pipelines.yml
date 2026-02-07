@@ -306,26 +306,33 @@ stages:
       inputs:
         targetType: 'inline'
         script: |
-          set -euo pipefail
+            set -euo pipefail
 
-          echo "Cluster=$(EKS_CLUSTER_NAME) Region=$(AWS_DEFAULT_REGION) VPC_ID=$(VPC_ID)"
+            echo "Cluster=$(EKS_CLUSTER_NAME) Region=$(AWS_DEFAULT_REGION) VPC_ID=$(VPC_ID)"
+            helm repo add eks https://aws.github.io/eks-charts
+            helm repo update
 
-          helm repo add eks https://aws.github.io/eks-charts
-          helm repo update
+            # ===== NEW: recover from pending helm operations =====
+            STATUS=$(helm -n kube-system status aws-load-balancer-controller 2>/dev/null | awk -F': ' '/^STATUS:/ {print $2}' || true)
+            echo "Current helm release status: ${STATUS:-none}"
 
-          helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
-            -n kube-system \
-            --set clusterName="$(EKS_CLUSTER_NAME)" \
-            --set region="$(AWS_DEFAULT_REGION)" \
-            --set vpcId="$(VPC_ID)" \
-            --set serviceAccount.create=true \
-            --set serviceAccount.name=aws-load-balancer-controller \
-            --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="$(LBC_ROLE_ARN)" \
-            --wait --timeout 10m
+            if echo "${STATUS}" | grep -qi '^pending'; then
+              echo "Pending operation detected -> uninstalling to recover"
+              helm -n kube-system uninstall aws-load-balancer-controller || true
+            fi
 
-          kubectl -n kube-system get sa aws-load-balancer-controller -o yaml | grep -i role-arn
-          kubectl -n kube-system rollout status deploy/aws-load-balancer-controller --timeout=5m
-          kubectl -n kube-system get pods -l app.kubernetes.io/name=aws-load-balancer-controller -o wide
+            helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+              -n kube-system \
+              --set clusterName="$(EKS_CLUSTER_NAME)" \
+              --set region="$(AWS_DEFAULT_REGION)" \
+              --set vpcId="$(VPC_ID)" \
+              --set serviceAccount.create=true \
+              --set serviceAccount.name=aws-load-balancer-controller \
+              --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="$(LBC_ROLE_ARN)" \
+              --wait --timeout 10m
+              
+            kubectl -n kube-system rollout status deploy/aws-load-balancer-controller --timeout=5m
+            kubectl -n kube-system logs deploy/aws-load-balancer-controller --tail=100
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
