@@ -45,3 +45,8 @@ variable "nodes_sg_id" {
   description = "The security group ID for EKS worker nodes"
   type        = string
 }
+
+variable "ssh_key_name" {
+  description = "The name of the SSH key pair for EKS worker nodes"
+  type        = string
+}
