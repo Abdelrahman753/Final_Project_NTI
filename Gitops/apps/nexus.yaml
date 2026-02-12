@@ -27,16 +27,10 @@ spec:
         ingress:
           enabled: false
 
-        extraVolumes:
-          - name: nexus-properties
-            configMap:
-              name: nexus-properties
-
-        extraVolumeMounts:
-          - name: nexus-properties
-            mountPath: /nexus-data/etc/nexus.properties
-            subPath: nexus.properties
-            readOnly: true
+        properties:
+          - nexus.datastore.enabled=true
+          - nexus.loadAsOSS=true
+          - nexus-context-path=/nexus
   syncPolicy:
     automated:
       prune: true
