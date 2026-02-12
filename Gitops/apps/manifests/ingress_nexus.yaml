@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nexus
+  namespace: nexus
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /nexus(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: nexus-repository-manager
+            port:
+              number: 8081

@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nexus
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://sonatype.github.io/helm3-charts/
+    chart: nexus-repository-manager
+    targetRevision: "64.2.0"
+    helm:
+      values: |
+        persistence:
+          enabled: true
+          storageClass: gp3
+          accessMode: ReadWriteOnce
+          size: 1Gi
+
+        service:
+          type: ClusterIP
+
+        ingress:
+          enabled: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nexus
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+
