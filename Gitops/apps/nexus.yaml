@@ -11,9 +11,9 @@ spec:
     server: https://kubernetes.default.svc
     namespace: nexus
   source:
-    repoURL: https://sonatype.github.io/helm3-charts/
-    chart: nexus-repository-manager
-    targetRevision: "64.2.0"
+    repoURL: https://stevehipwell.github.io/helm-charts/
+    chart: stevehipwell
+    targetRevision: "5.19.0"
     helm:
       values: |
         nexus:
