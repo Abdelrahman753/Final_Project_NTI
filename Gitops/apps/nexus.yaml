@@ -15,21 +15,28 @@ spec:
     chart: nexus3
     targetRevision: "5.19.0"
     helm:
-      values: |
-        persistence:
-          enabled: true
-          storageClass: gp3
-          size: 2Gi
+  values: |
+    persistence:
+      enabled: true
+      storageClass: gp3
+      size: 2Gi
 
-        service:
-          type: ClusterIP
+    service:
+      type: ClusterIP
 
-        ingress:
-          enabled: false
+    ingress:
+      enabled: false
 
-        properties:
-          nexus-context-path: /nexus
+    extraVolumes:
+      - name: nexus-properties
+        configMap:
+          name: nexus-properties
 
+    extraVolumeMounts:
+      - name: nexus-properties
+        mountPath: /nexus-data/etc/nexus.properties
+        subPath: nexus.properties
+        readOnly: true
   syncPolicy:
     automated:
       prune: true

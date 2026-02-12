@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nexus-properties
+  namespace: nexus
+data:
+  nexus.properties: |
+    nexus-context-path=/nexus
