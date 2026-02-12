@@ -16,24 +16,23 @@ spec:
     targetRevision: "2026.1.0"
     helm:
       values: |
+        monitoringPasscode: "abdo-monitor"
+
         postgresql:
-        enabled: true
-
-        image:
-          registry: docker.io
-          repository: bitnami/postgresql
-          digest: "sha256:08c24fb306eaa20160fc945c3599b21288d161c0b2b3b680157679987371e227"
-
-        primary:
-          persistence:
-            enabled: true
-            storageClass: gp3
-            size: 2Gi
-
-        auth:
-          username: sonar
-          database: sonar
-          password: "abdo"
+          enabled: true
+          image:
+            registry: docker.io
+            repository: bitnami/postgresql
+            digest: "sha256:08c24fb306eaa20160fc945c3599b21288d161c0b2b3b680157679987371e227"
+          primary:
+            persistence:
+              enabled: true
+              storageClass: gp3
+              size: 2Gi
+          auth:
+            username: sonar
+            database: sonar
+            password: "abdo"
 
         ingress:
           enabled: false
