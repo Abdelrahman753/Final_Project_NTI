@@ -5,26 +5,40 @@ variables:
   AWS_REGION: "us-east-1"
   EKS_CLUSTER: "nonprod-eks-cluster"
   ARGO_NS: "argocd"
-  API_BASE: "https://qj6jvlfmgh.execute-api.us-east-1.amazonaws.com"
-  ARGO_PATH: "/argocd"
 
 stages:
 - stage: Bootstrap
-  displayName: "Bootstrap ArgoCD + OIDC + Root App"
+  displayName: "Bootstrap ArgoCD + Apply Root App"
   jobs:
   - job: BootstrapJob
-    displayName: "Install ArgoCD + Configure Cognito OIDC + Apply GitOps Root"
+    displayName: "Install ArgoCD + Apply root-app"
     pool: { name: default }
 
     steps:
     - checkout: self
 
+    # Helm
     - task: HelmInstaller@1
       displayName: "Install Helm"
       inputs:
         helmVersionToInstall: "latest"
 
-    # 1) kubeconfig
+    # (اختياري) تأكيد إن الـ AWS creds شغالة
+    - task: Bash@3
+      displayName: "AWS sanity check"
+      inputs:
+        targetType: inline
+        script: |
+          set -euo pipefail
+          echo "UTC time: $(date -u)"
+          aws --version
+          aws sts get-caller-identity --region "$(AWS_REGION)"
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_REGION: $(AWS_REGION)
+
+    # Configure kubeconfig for EKS
     - task: Bash@3
       displayName: "Configure kubeconfig for EKS"
       inputs:
@@ -39,24 +53,26 @@ stages:
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
         AWS_REGION: $(AWS_REGION)
 
-    # 2) Install ArgoCD under /argocd
+    # Helm repo add/update
     - task: Bash@3
-      displayName: "Install/Upgrade ArgoCD (subpath /argocd)"
+      displayName: "Helm repo add/update (argo)"
       inputs:
         targetType: inline
         script: |
           set -euo pipefail
-          ARGO_URL="$(API_BASE)$(ARGO_PATH)"
-          echo "ArgoCD URL: ${ARGO_URL}"
-
           helm repo add argo https://argoproj.github.io/argo-helm
           helm repo update
 
+    # Install ArgoCD
+    - task: Bash@3
+      displayName: "Install/Upgrade ArgoCD (helm)"
+      inputs:
+        targetType: inline
+        script: |
+          set -euo pipefail
           helm upgrade --install argocd argo/argo-cd \
             -n "$(ARGO_NS)" --create-namespace \
-            --set server.basehref="$(ARGO_PATH)" \
-            --set server.rootpath="$(ARGO_PATH)" \
-            --set configs.cm.url="${ARGO_URL}" \
+            --set configs.params.server\.insecure=true \
             --wait --timeout 10m
 
           kubectl -n "$(ARGO_NS)" rollout status deploy/argocd-server --timeout=10m
@@ -65,111 +81,14 @@ stages:
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
         AWS_REGION: $(AWS_REGION)
 
-    # 3) Apply ArgoCD Ingress (Path-based /argocd)
     - task: Bash@3
-      displayName: "Apply ArgoCD Ingress (/argocd)"
-      inputs:
-        targetType: inline
-        script: |
-          set -euo pipefail
-
-          cat > ingress-argocd.yaml <<'EOF'
-          apiVersion: networking.k8s.io/v1
-          kind: Ingress
-          metadata:
-            name: argocd
-            namespace: argocd
-            annotations:
-              nginx.ingress.kubernetes.io/use-regex: "true"
-              nginx.ingress.kubernetes.io/rewrite-target: /$2
-              nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-              nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-              nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-          spec:
-            ingressClassName: nginx
-            rules:
-            - http:
-                paths:
-                - path: /argocd(/|$)(.*)
-                  pathType: ImplementationSpecific
-                  backend:
-                    service:
-                      name: argocd-server
-                      port:
-                        number: 443
-          EOF
-
-          kubectl apply -f ingress-argocd.yaml
-          kubectl -n argocd get ingress argocd -o wide
-      env:
-        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
-        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-        AWS_REGION: $(AWS_REGION)
-
-    # 4) Configure Cognito OIDC (Dex) + client secret from Azure DevOps secret variable
-    - task: Bash@3
-      displayName: "Configure ArgoCD OIDC (Cognito via Dex)"
-      inputs:
-        targetType: inline
-        script: |
-          set -euo pipefail
-
-          ARGO_URL="$(API_BASE)$(ARGO_PATH)"
-
-          # Create/Update argocd-secret with dex.clientSecret
-          kubectl -n argocd create secret generic argocd-secret \
-            --from-literal=dex.clientSecret="$(COGNITO_CLIENT_SECRET)" \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-          # Update argocd-cm with dex.config + url
-          cat > argocd-cm-oidc.yaml <<EOF
-          apiVersion: v1
-          kind: ConfigMap
-          metadata:
-            name: argocd-cm
-            namespace: argocd
-          data:
-            url: "${ARGO_URL}"
-            dex.config: |
-              connectors:
-              - type: oidc
-                id: cognito
-                name: Cognito
-                config:
-                  issuer: "$(COGNITO_ISSUER)"
-                  clientID: "$(COGNITO_CLIENT_ID)"
-                  clientSecret: \$dex.clientSecret
-                  redirectURI: "${ARGO_URL}/api/dex/callback"
-                  scopes:
-                  - openid
-                  - profile
-                  - email
-          EOF
-
-          kubectl apply -f argocd-cm-oidc.yaml
-
-          # Restart ArgoCD components to pick up changes
-          kubectl -n argocd rollout restart deploy/argocd-dex-server || true
-          kubectl -n argocd rollout restart deploy/argocd-server
-
-          kubectl -n argocd rollout status deploy/argocd-server --timeout=10m
-      env:
-        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
-        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-        AWS_REGION: $(AWS_REGION)
-        COGNITO_ISSUER: $(COGNITO_ISSUER)
-        COGNITO_CLIENT_ID: $(COGNITO_CLIENT_ID)
-        COGNITO_CLIENT_SECRET: $(COGNITO_CLIENT_SECRET)
-
-    # 5) Apply GitOps root-app (App of Apps)
-    - task: Bash@3
-      displayName: "Apply GitOps Root App"
+      displayName: "Apply root-app.yaml"
       inputs:
         targetType: inline
         script: |
           set -euo pipefail
           kubectl apply -f Gitops/argocd/root-app.yaml
-          kubectl -n argocd get applications.argoproj.io
+          kubectl -n "$(ARGO_NS)" get applications.argoproj.io
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
