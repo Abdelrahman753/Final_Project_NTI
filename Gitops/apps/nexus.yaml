@@ -13,7 +13,7 @@ spec:
     helm:
       values: |
         persistence:
-          enabled: true
+          enabled: false
           storageClass: gp3
           accessMode: ReadWriteOnce
           size: 1Gi

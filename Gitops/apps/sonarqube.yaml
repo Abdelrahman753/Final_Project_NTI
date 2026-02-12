@@ -13,7 +13,7 @@ spec:
     helm:
       values: |
         persistence:
-          enabled: true
+          enabled: false
           storageClass: gp3
           size: 5Gi
 
@@ -22,7 +22,7 @@ spec:
 
         # Enable bundled PostgreSQL (nonprod)
         postgresql:
-          enabled: true
+          enabled: false
           persistence:
             enabled: true
             storageClass: gp3
@@ -30,7 +30,7 @@ spec:
 
         sonarProperties:
           sonar.web.context: /sonar
-          sonar.core.serverBaseURL: https://YOUR_API_GATEWAY_ENDPOINT/sonar
+          sonar.core.serverBaseURL: https://https://qj6jvlfmgh.execute-api.us-east-1.amazonaws.com/sonar
 
         ingress:
           enabled: false
