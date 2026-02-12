@@ -6,7 +6,7 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   ingressClassName: nginx
   rules:
@@ -16,6 +16,6 @@ spec:
         pathType: ImplementationSpecific
         backend:
           service:
-            name: nexus-repository-manager
+            name: nexus-nexus3
             port:
               number: 8081
