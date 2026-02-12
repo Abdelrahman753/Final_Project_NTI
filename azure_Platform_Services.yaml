@@ -11,7 +11,7 @@ stages:
   displayName: "Bootstrap ArgoCD + Apply Root App"
   jobs:
   - job: BootstrapJob
-    displayName: "Install ArgoCD + Apply root-app"
+    displayName: "Install/Upgrade ArgoCD + Configure /argocd + Apply root-app"
     pool: { name: default }
 
     steps:
@@ -23,14 +23,12 @@ stages:
       inputs:
         helmVersionToInstall: "latest"
 
-    # (اختياري) تأكيد إن الـ AWS creds شغالة
     - task: Bash@3
       displayName: "AWS sanity check"
       inputs:
         targetType: inline
         script: |
           set -euo pipefail
-          echo "UTC time: $(date -u)"
           aws --version
           aws sts get-caller-identity --region "$(AWS_REGION)"
       env:
@@ -38,14 +36,12 @@ stages:
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
         AWS_REGION: $(AWS_REGION)
 
-    # Configure kubeconfig for EKS
     - task: Bash@3
       displayName: "Configure kubeconfig for EKS"
       inputs:
         targetType: inline
         script: |
           set -euo pipefail
-          echo "Cluster=$(EKS_CLUSTER) Region=$(AWS_REGION)"
           aws eks update-kubeconfig --name "$(EKS_CLUSTER)" --region "$(AWS_REGION)"
           kubectl get nodes -o wide
       env:
@@ -53,7 +49,6 @@ stages:
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
         AWS_REGION: $(AWS_REGION)
 
-    # Helm repo add/update
     - task: Bash@3
       displayName: "Helm repo add/update (argo)"
       inputs:
@@ -63,32 +58,54 @@ stages:
           helm repo add argo https://argoproj.github.io/argo-helm
           helm repo update
 
-    # Install ArgoCD
     - task: Bash@3
-      displayName: "Install/Upgrade ArgoCD (helm)"
+      displayName: "Install/Upgrade ArgoCD (helm) + set /argocd"
       inputs:
         targetType: inline
         script: |
           set -euo pipefail
+
           helm upgrade --install argocd argo/argo-cd \
             -n "$(ARGO_NS)" --create-namespace \
             --set configs.params.server\.insecure=true \
+            --set server.extraArgs[0]=--basehref \
+            --set server.extraArgs[1]=/argocd \
+            --set server.extraArgs[2]=--rootpath \
+            --set server.extraArgs[3]=/argocd \
             --wait --timeout 10m
 
           kubectl -n "$(ARGO_NS)" rollout status deploy/argocd-server --timeout=10m
+
+          echo "argocd-server args:"
+          kubectl -n "$(ARGO_NS)" get deploy argocd-server -o jsonpath='{.spec.template.spec.containers[0].args}' ; echo
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
         AWS_REGION: $(AWS_REGION)
 
     - task: Bash@3
-      displayName: "Apply root-app.yaml"
+      displayName: "Apply root-app.yaml (platform-manifests)"
       inputs:
         targetType: inline
         script: |
           set -euo pipefail
           kubectl apply -f Gitops/argocd/root-app.yaml
           kubectl -n "$(ARGO_NS)" get applications.argoproj.io
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_REGION: $(AWS_REGION)
+
+    - task: Bash@3
+      displayName: "Verify ArgoCD ingress/service"
+      inputs:
+        targetType: inline
+        script: |
+          set -euo pipefail
+          echo "Ingress in argocd namespace:"
+          kubectl -n "$(ARGO_NS)" get ingress || true
+          echo "Service argocd-server:"
+          kubectl -n "$(ARGO_NS)" get svc argocd-server -o wide
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
