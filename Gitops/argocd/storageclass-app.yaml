@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-storage
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  source:
+    repoURL: https://github.com/Abdelrahman753/Final_Project_NTI.git
+    targetRevision: gitops
+    path: Gitops/cluster
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
