@@ -12,29 +12,24 @@ spec:
     targetRevision: "10.6.0"
     helm:
       values: |
+        # ---- Disable persistence completely ----
         persistence:
           enabled: false
-          storageClass: gp3
-          size: 5Gi
-
+    
+        # Some chart templates still mount PVC unless this is empty/false
+        sonarWebContext: /sonar
+    
         service:
           type: ClusterIP
-
-        # Enable bundled PostgreSQL (nonprod)
+    
+        # ---- Use embedded H2 (test only) by disabling PostgreSQL ----
         postgresql:
           enabled: false
-          persistence:
-            enabled: false
-            storageClass: gp3
-            size: 1Gi
-
+    
+        # ---- Fix base URL ----
         sonarProperties:
           sonar.web.context: /sonar
-          sonar.core.serverBaseURL: https://https://qj6jvlfmgh.execute-api.us-east-1.amazonaws.com/sonar
-
-        ingress:
-          enabled: false
-
+          sonar.core.serverBaseURL: https://qj6jvlfmgh.execute-api.us-east-1.amazonaws.com/sonar
   destination:
     server: https://kubernetes.default.svc
     namespace: sonarqube
