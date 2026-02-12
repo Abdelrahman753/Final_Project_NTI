@@ -16,23 +16,16 @@ spec:
     targetRevision: "2026.1.0"
     helm:
       values: |
+        # required by chart validation (probes)
         monitoringPasscode: "abdo-monitor"
 
-        postgresql:
+        community:
           enabled: true
-          image:
-            registry: docker.io
-            repository: bitnami/postgresql
-            digest: "sha256:08c24fb306eaa20160fc945c3599b21288d161c0b2b3b680157679987371e227"
-          primary:
-            persistence:
-              enabled: true
-              storageClass: gp3
-              size: 2Gi
-          auth:
-            username: sonar
-            database: sonar
-            password: "abdo"
+
+        sonarWebContext: /sonar
+
+        service:
+          type: ClusterIP
 
         ingress:
           enabled: false
