@@ -16,13 +16,15 @@ spec:
     targetRevision: "2026.1.0"
     helm:
       values: |
-        # required by chart validation (probes)
         monitoringPasscode: "abdo-monitor"
 
         community:
           enabled: true
 
         sonarWebContext: /sonar
+
+        sonarProperties:
+          sonar.core.serverBaseURL: https://qj6jvlfmgh.execute-api.us-east-1.amazonaws.com/sonar
 
         service:
           type: ClusterIP
