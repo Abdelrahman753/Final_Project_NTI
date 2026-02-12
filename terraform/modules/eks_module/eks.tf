@@ -64,10 +64,6 @@ resource "aws_eks_node_group" "node_group" {
     min_size     = var.min_capacity
   }
 
-  remote_access {
-    ec2_ssh_key               = var.ssh_key_name
-    source_security_group_ids = [var.nodes_sg_id]           
-  }
 
   labels = { env = var.env }
   tags   = merge(var.tags, { Name = "${var.eks_cluster_name}-node-group" })
@@ -165,3 +161,48 @@ resource "aws_eks_node_group" "node_group" {
 
 
 
+# =========================
+# IRSA for EBS CSI Driver
+# ServiceAccount: kube-system/ebs-csi-controller-sa
+# =========================
+resource "aws_iam_role" "ebs_csi_driver" {
+  name = "${var.env}-ebs-csi-driver-irsa"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      },
+      Action = "sts:AssumeRoleWithWebIdentity",
+      Condition = {
+        StringEquals = {
+          "${local.oidc_issuer}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa",
+          "${local.oidc_issuer}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi_driver_attach" {
+  role       = aws_iam_role.ebs_csi_driver.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+
+resource "aws_eks_addon" "ebs_csi_driver" {
+  cluster_name             = aws_eks_cluster.eks_cluster.name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.ebs_csi_driver.arn
+
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [
+    aws_iam_openid_connect_provider.eks,
+    aws_iam_role_policy_attachment.ebs_csi_driver_attach
+  ]
+}

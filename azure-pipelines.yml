@@ -397,4 +397,18 @@ stages:
 
           
 
- 
+    - task: Bash@3
+      displayName: "Write tf outputs artifact"
+      inputs:
+       targetType: 'inline'
+       script: |
+         set -euo pipefail
+         cd terraform
+         terraform output -json > $(Build.ArtifactStagingDirectory)/tfouts.json
+
+    - task: PublishPipelineArtifact@1
+      displayName: "Publish tf outputs"
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/tfouts.json'
+        artifact: 'tfouts'
+        publishLocation: 'pipeline'

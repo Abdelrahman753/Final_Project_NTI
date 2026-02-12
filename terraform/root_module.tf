@@ -61,14 +61,12 @@ module "eks_module" {
     module.subnets_module.presentation_subnets_id,
     module.subnets_module.backend_subnets_id
   ])
-  nodes_sg_id      = module.security_group_module.nodes_sg_id
   tags             = var.tags
   env              = var.env
   desired_capacity = var.desired_capacity
   max_capacity     = var.max_capacity
   min_capacity     = var.min_capacity
   instance_types   = var.instance_types
-  ssh_key_name     = var.ssh_key_name
 }
 
 
@@ -107,5 +105,4 @@ module "api_gateway_module" {
   nlb_listener_arn = module.nlb_module.listener_arn
   
 }
-
 

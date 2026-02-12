@@ -2,6 +2,3 @@ output "vpc_link_sg_id" {
     value = aws_security_group.vpc_link_sg.id
 }
 
-output "nodes_sg_id" {
-  value = aws_security_group.nodes_sg.id
-}

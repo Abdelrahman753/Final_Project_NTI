@@ -26,6 +26,10 @@ spec:
 
         ingress:
           enabled: false
+
+        properties:
+          nexus-context-path: /nexus
+
   syncPolicy:
     automated:
       prune: true

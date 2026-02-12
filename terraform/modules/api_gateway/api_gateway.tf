@@ -40,5 +40,3 @@ resource "aws_apigatewayv2_route" "proxy" {
   route_key = "ANY /{proxy+}"
   target    = "integrations/${aws_apigatewayv2_integration.nlb.id}"
 }
-
-

@@ -1,0 +1,23 @@
+{
+    "addon": {
+        "addonName": "aws-ebs-csi-driver",
+        "clusterName": "nonprod-eks-cluster",
+        "status": "CREATE_FAILED",
+        "addonVersion": "v1.55.0-eksbuild.2",
+        "health": {
+            "issues": [
+                {
+                    "code": "InsufficientNumberOfReplicas",
+                    "message": "The add-on is unhealthy because one or more pods have waiting containers: 2/4 pods available. Pods are waiting because: CrashLoopBackOff: Error leaf.managedByPickfirstKeyType={})>\": \"<%!p(bool=true)>\" }}. Err: connection error: desc = \"transport: Error while dialing: dial unix /var/lib/csi/sockets/pluginproxy/csi.sock: connect: connection refused\"\nW0212 18:03:09.524876       1 logging.go:55] [core] [Channel #1 SubChannel #2]grpc: addrConn.createTransport failed to connect to {Addr: \"/var/lib/csi/sockets/pluginproxy/csi.sock\", ServerName: \"localhost\", Attributes: {\"<%!p(networktype.keyType=grpc.internal.transport.networktype)>\": \"unix\" }, BalancerAttributes: {\"<%!p(pickfirstleaf.managedByPickfirstKeyType={})>\": \"<%!p(bool=true)>\" }}. Err: connection error: desc = \"transport: Error while dialing: dial unix /var/lib/csi/sockets/pluginproxy/csi.sock: connect: connection refused\"\nW0212 18:03:10.718846       1 logging.go:55] [core] [Channel #1 SubChannel #2]grpc: addrConn.createTransport failed to connect to {Addr: \"/var/lib/csi/sockets/pluginproxy/csi.sock\", ServerName: \"localhost\", Attributes: {\"<%!p(networktype.keyType=grpc.internal.transport.networktype)>\": \"unix\" }, BalancerAttributes: {\"<%!p(pickfirstleaf.managedByPickfirstKeyType={})>\": \"<%!p(bool=true)>\" }}. Err: connection error: desc = \"transport: Error while dialing: dial unix /var/lib/csi/sockets/pluginproxy/csi.sock: connect: connection refused\"\nW0212 18:03:11.610909       1 logging.go:55] [core] [Channel #1 SubChannel #2]grpc: addrConn.createTransport failed to connect to {Addr: \"/var/lib/csi/sockets/pluginproxy/csi.sock\", ServerName: \"localhost\", Attributes: {\"<%!p(networktype.keyType=grpc.internal.transport.networktype)>\": \"unix\" }, BalancerAttributes: {\"<%!p(pickfirstleaf.managedByPickfirstKeyType={})>\": \"<%!p(bool=true)>\" }}. Err: connection error: desc = \"transport: Error while dialing: dial unix /var/lib/csi/sockets/pluginproxy/csi.sock: connect: connection refused\"\nI0212 18:03:11.677628       1 connection.go:253] \"Still connecting\" address=\"unix:///var/lib/csi/sockets/pluginproxy/csi.sock\"\nE0212 18:03:11.677851       1 main.go:205] error connecting to CSI driver: context deadline exceeded\n"
+                }
+            ]
+        },
+        "addonArn": "arn:aws:eks:us-east-1:575108933009:addon/nonprod-eks-cluster/aws-ebs-csi-driver/a6ce2966-6e4d-018c-2731-6f61f05c714e",
+        "createdAt": "2026-02-12T19:01:23.648000+02:00",
+        "modifiedAt": "2026-02-12T20:07:50.589000+02:00",
+        "tags": {},
+        "namespaceConfig": {
+            "namespace": "kube-system"
+        }
+    }
+}
