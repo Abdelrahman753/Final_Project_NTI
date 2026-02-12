@@ -1,0 +1,64 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
+  source:
+    repoURL: https://helm.releases.hashicorp.com
+    chart: vault
+    targetRevision: 0.28.0
+    helm:
+      values: |
+        server:
+          enabled: true
+          ha:
+            enabled: true
+            replicas: 1
+            raft:
+              enabled: true
+              config: |
+                ui = true
+                cluster_name = "vault-eks"
+                listener "tcp" {
+                  address = "0.0.0.0:8200"
+                  cluster_address = "0.0.0.0:8201"
+                  tls_disable = 1
+                }
+                storage "raft" {
+                  path = "/vault/data"
+                }
+                service_registration "kubernetes" {}
+
+          dataStorage:
+            enabled: true
+            size: 1Gi
+            mountPath: /vault/data
+
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            annotations:
+              nginx.ingress.kubernetes.io/ssl-redirect: "false"
+            hosts:
+              - host: ""
+                paths:
+                  - /vault
+            pathType: Prefix
+
+        ui:
+          enabled: true
+
+        injector:
+          enabled: true
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
