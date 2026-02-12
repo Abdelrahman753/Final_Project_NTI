@@ -26,6 +26,7 @@ spec:
               config: |
                 ui = true
                 cluster_name = "vault-eks"
+
                 api_addr = "https://qj6jvlfmgh.execute-api.us-east-1.amazonaws.com/vault"
 
                 listener "tcp" {

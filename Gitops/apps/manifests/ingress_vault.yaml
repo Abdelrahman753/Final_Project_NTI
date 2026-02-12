@@ -4,20 +4,20 @@ metadata:
   name: vault
   namespace: vault
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header X-Forwarded-Prefix /vault;
+    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-redirect-from: "~^(/)(.*)$"
+    nginx.ingress.kubernetes.io/proxy-redirect-to: "/vault/$2"
 spec:
   ingressClassName: nginx
   rules:
-    - http:
-        paths:
-          - path: /vault(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: vault
-                port:
-                  number: 8200
+  - http:
+      paths:
+      - path: /vault(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: vault-ui
+            port:
+              number: 8200
