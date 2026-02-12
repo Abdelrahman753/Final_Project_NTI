@@ -24,7 +24,7 @@ spec:
         postgresql:
           enabled: false
           persistence:
-            enabled: true
+            enabled: false
             storageClass: gp3
             size: 1Gi
 
