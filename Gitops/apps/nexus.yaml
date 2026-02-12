@@ -27,6 +27,21 @@ spec:
         ingress:
           enabled: false
 
+        startupProbe:
+          httpGet:
+            path: /nexus/
+            port: http
+
+        livenessProbe:
+          httpGet:
+            path: /nexus/
+            port: http
+        
+        readinessProbe:
+          httpGet:
+            path: /nexus/service/rest/v1/status
+            port: http
+
         properties:
           - nexus.datastore.enabled=true
           - nexus.loadAsOSS=true
