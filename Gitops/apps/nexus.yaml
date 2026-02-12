@@ -27,25 +27,37 @@ spec:
         ingress:
           enabled: false
 
+        properties:
+          - nexus.datastore.enabled=true
+          - nexus.loadAsOSS=true
+          - nexus-context-path=/nexus
+
         startupProbe:
           httpGet:
             path: /nexus/
             port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 180
 
         livenessProbe:
           httpGet:
             path: /nexus/
             port: http
-        
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+
         readinessProbe:
           httpGet:
             path: /nexus/service/rest/v1/status
             port: http
-
-        properties:
-          - nexus.datastore.enabled=true
-          - nexus.loadAsOSS=true
-          - nexus-context-path=/nexus
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 10
   syncPolicy:
     automated:
       prune: true
