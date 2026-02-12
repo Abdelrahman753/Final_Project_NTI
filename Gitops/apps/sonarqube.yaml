@@ -27,17 +27,16 @@ spec:
 
         # --- PostgreSQL (Bitnami) persistence on gp3 + force PG15 image ---
         postgresql:
-          enabled: true
-
-          primary:
-            image:
-              registry: docker.io
-              repository: bitnami/postgresql
-              tag: 15.5.0-debian-12-r0
-            persistence:
-              enabled: true
-              storageClass: gp3
-              size: 2Gi
+            enabled: true
+            primary:
+              persistence:
+                enabled: true
+                storageClass: gp3
+                size: 2Gi
+            auth:
+              username: sonar
+              database: sonar
+              password: "abdo"
 
           auth:
             username: sonar
