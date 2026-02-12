@@ -1,0 +1,76 @@
+trigger:
+- main
+
+variables:
+  AWS_REGION: "us-east-1"
+  EKS_CLUSTER: "nonprod-eks-cluster"
+  ARGO_NS: "argocd"
+
+stages:
+- stage: Bootstrap
+  jobs:
+  - job: BootstrapJob
+    pool: { name: default }
+    steps:
+    - checkout: self
+
+    - task: HelmInstaller@1
+      inputs:
+        helmVersionToInstall: "latest"
+
+    - task: Bash@3
+      displayName: "AWS sanity check"
+      inputs:
+        targetType: inline
+        script: |
+          set -euo pipefail
+          aws sts get-caller-identity --region "$(AWS_REGION)"
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_REGION: $(AWS_REGION)
+
+    - task: Bash@3
+      displayName: "Configure kubeconfig for EKS"
+      inputs:
+        targetType: inline
+        script: |
+          set -euo pipefail
+          aws eks update-kubeconfig --name "$(EKS_CLUSTER)" --region "$(AWS_REGION)"
+          kubectl get nodes -o wide
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_REGION: $(AWS_REGION)
+
+    - task: Bash@3
+      displayName: "Helm repo add/update (argo)"
+      inputs:
+        targetType: inline
+        script: |
+          set -euo pipefail
+          helm repo add argo https://argoproj.github.io/argo-helm
+          helm repo update
+
+    - task: Bash@3
+      displayName: "Install/Upgrade ArgoCD (helm)"
+      inputs:
+        targetType: inline
+        script: |
+          set -euo pipefail
+          helm upgrade --install argocd argo/argo-cd \
+            -n "$(ARGO_NS)" --create-namespace \
+            --set configs.params.server\.insecure=true \
+            --wait --timeout 10m
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_REGION: $(AWS_REGION)
+
+    - task: Kubernetes@1
+      displayName: "Apply Root Application"
+      inputs:
+        connectionType: "None"
+        command: "apply"
+        useConfigurationFile: true
+        configuration: "Gitops/argocd/root-app.yaml"
