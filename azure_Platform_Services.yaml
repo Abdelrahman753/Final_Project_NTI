@@ -8,34 +8,44 @@ variables:
 
 stages:
 - stage: Bootstrap
+  displayName: "Bootstrap ArgoCD + Apply Root App"
   jobs:
   - job: BootstrapJob
+    displayName: "Install ArgoCD + Apply root-app"
     pool: { name: default }
+
     steps:
     - checkout: self
 
+    # Helm
     - task: HelmInstaller@1
+      displayName: "Install Helm"
       inputs:
         helmVersionToInstall: "latest"
 
+    # (اختياري) تأكيد إن الـ AWS creds شغالة
     - task: Bash@3
       displayName: "AWS sanity check"
       inputs:
         targetType: inline
         script: |
           set -euo pipefail
+          echo "UTC time: $(date -u)"
+          aws --version
           aws sts get-caller-identity --region "$(AWS_REGION)"
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
         AWS_REGION: $(AWS_REGION)
 
+    # Configure kubeconfig for EKS
     - task: Bash@3
       displayName: "Configure kubeconfig for EKS"
       inputs:
         targetType: inline
         script: |
           set -euo pipefail
+          echo "Cluster=$(EKS_CLUSTER) Region=$(AWS_REGION)"
           aws eks update-kubeconfig --name "$(EKS_CLUSTER)" --region "$(AWS_REGION)"
           kubectl get nodes -o wide
       env:
@@ -43,6 +53,7 @@ stages:
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
         AWS_REGION: $(AWS_REGION)
 
+    # Helm repo add/update
     - task: Bash@3
       displayName: "Helm repo add/update (argo)"
       inputs:
@@ -52,6 +63,7 @@ stages:
           helm repo add argo https://argoproj.github.io/argo-helm
           helm repo update
 
+    # Install ArgoCD
     - task: Bash@3
       displayName: "Install/Upgrade ArgoCD (helm)"
       inputs:
@@ -62,18 +74,22 @@ stages:
             -n "$(ARGO_NS)" --create-namespace \
             --set configs.params.server\.insecure=true \
             --wait --timeout 10m
+
+          kubectl -n "$(ARGO_NS)" rollout status deploy/argocd-server --timeout=10m
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
         AWS_REGION: $(AWS_REGION)
 
-    - task: Kubernetes@1
-      displayName: "Apply Root Application"
+    # Apply root-app (App of Apps)
+    - task: Bash@3
+      displayName: "Apply root-app.yaml"
       inputs:
-        connectionType: "None"
-        command: "apply"
-        useConfigurationFile: true
-        configuration: "Gitops/argocd/root-app.yaml"
+        targetType: inline
+        script: |
+          set -euo pipefail
+          kubectl apply -f Gitops/argocd/root-app.yaml
+          kubectl -n "$(ARGO_NS)" get applications.argoproj.io
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
