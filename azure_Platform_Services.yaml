@@ -1,10 +1,23 @@
 trigger:
 - main
 
+parameters:
+- name: environment
+  displayName: "Choose Environment"
+  type: string
+  default: nonprod
+  values:
+  - nonprod
+  - prod
+
 variables:
   AWS_REGION: "us-east-1"
-  EKS_CLUSTER: "nonprod-eks-cluster"
   ARGO_NS: "argocd"
+
+  # Terraform
+  TF_VERSION: "latest"
+  TF_DIR: "terraform"
+  TF_ENV: ${{ parameters.environment }}
 
 stages:
 - stage: Bootstrap
@@ -12,17 +25,28 @@ stages:
   jobs:
   - job: BootstrapJob
     displayName: "Install/Upgrade ArgoCD + Configure /argocd + Apply root-app"
-    pool: { name: default }
+    pool:
+      name: default
 
     steps:
     - checkout: self
 
-    # Helm
+    # =========================
+    # Tools
+    # =========================
     - task: HelmInstaller@1
       displayName: "Install Helm"
       inputs:
         helmVersionToInstall: "latest"
 
+    - task: TerraformInstaller@1
+      displayName: "Install Terraform"
+      inputs:
+        terraformVersion: '$(TF_VERSION)'
+
+    # =========================
+    # AWS sanity
+    # =========================
     - task: Bash@3
       displayName: "AWS sanity check"
       inputs:
@@ -34,21 +58,82 @@ stages:
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-        AWS_REGION: $(AWS_REGION)
+        AWS_DEFAULT_REGION: $(AWS_REGION)
+
+    # =========================
+    # Terraform init + outputs
+    # =========================
+    - task: TerraformCLI@1
+      displayName: "Terraform Init (read outputs)"
+      inputs:
+        command: 'init'
+        workingDirectory: '$(TF_DIR)'
+        commandOptions: '-reconfigure'
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_REGION)
 
     - task: Bash@3
-      displayName: "Configure kubeconfig for EKS"
+      displayName: "Read Terraform outputs (cluster name + API endpoint) -> set pipeline vars"
       inputs:
         targetType: inline
         script: |
           set -euo pipefail
+          cd "$(TF_DIR)"
+
+          terraform output -json > /tmp/tfouts.json
+
+          CLUSTER_NAME="$(jq -r '.eks_cluster_name.value // empty' /tmp/tfouts.json)"
+          API_ENDPOINT="$(jq -r '.api_endpoint.value // empty' /tmp/tfouts.json)"
+
+          echo "TF_ENV=$(TF_ENV)"
+          echo "Cluster=${CLUSTER_NAME}"
+          echo "API Endpoint=${API_ENDPOINT}"
+
+          if [ -z "${CLUSTER_NAME}" ] || [ "${CLUSTER_NAME}" = "null" ]; then
+            echo "ERROR: eks_cluster_name output missing"
+            exit 1
+          fi
+
+          if [ -z "${API_ENDPOINT}" ] || [ "${API_ENDPOINT}" = "null" ]; then
+            echo "ERROR: api_endpoint output missing"
+            exit 1
+          fi
+
+          # final external url for ArgoCD behind API Gateway subpath
+          ARGOCD_URL="${API_ENDPOINT%/}/argocd"
+
+          echo "ARGOCD_URL=${ARGOCD_URL}"
+
+          echo "##vso[task.setvariable variable=EKS_CLUSTER]${CLUSTER_NAME}"
+          echo "##vso[task.setvariable variable=API_ENDPOINT]${API_ENDPOINT}"
+          echo "##vso[task.setvariable variable=ARGOCD_URL]${ARGOCD_URL}"
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_REGION)
+
+    # =========================
+    # kubeconfig
+    # =========================
+    - task: Bash@3
+      displayName: "Configure kubeconfig for EKS (from TF output)"
+      inputs:
+        targetType: inline
+        script: |
+          set -euo pipefail
+          echo "Using cluster: $(EKS_CLUSTER) region: $(AWS_REGION)"
           aws eks update-kubeconfig --name "$(EKS_CLUSTER)" --region "$(AWS_REGION)"
           kubectl get nodes -o wide
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-        AWS_REGION: $(AWS_REGION)
+        AWS_DEFAULT_REGION: $(AWS_REGION)
 
+    # =========================
+    # Helm repo
+    # =========================
     - task: Bash@3
       displayName: "Helm repo add/update (argo)"
       inputs:
@@ -58,31 +143,53 @@ stages:
           helm repo add argo https://argoproj.github.io/argo-helm
           helm repo update
 
+    # =========================
+    # Install/Upgrade ArgoCD (the working config)
+    # - subpath /argocd
+    # - configs.cm.url = external API GW URL + /argocd
+    # - ingress backend HTTPS + servicePort 443 (fixes 307 loop)
+    # =========================
     - task: Bash@3
-      displayName: "Install/Upgrade ArgoCD (helm) + set /argocd"
+      displayName: "Install/Upgrade ArgoCD (helm) + set /argocd + set external URL + backend HTTPS"
       inputs:
         targetType: inline
         script: |
           set -euo pipefail
 
+          echo "Using ARGOCD_URL=$(ARGOCD_URL)"
+
           helm upgrade --install argocd argo/argo-cd \
             -n "$(ARGO_NS)" --create-namespace \
-            --set configs.params.server\.insecure=true \
+            --set configs.cm.url="$(ARGOCD_URL)" \
+            --set configs.params.server\.insecure=false \
             --set server.extraArgs[0]=--basehref \
             --set server.extraArgs[1]=/argocd \
             --set server.extraArgs[2]=--rootpath \
             --set server.extraArgs[3]=/argocd \
+            --set server.ingress.enabled=true \
+            --set server.ingress.ingressClassName=nginx \
+            --set server.ingress.path=/argocd \
+            --set server.ingress.pathType=Prefix \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"=HTTPS \
+            --set server.ingress.annotations."nginx\.ingress\.kubernetes\.io/ssl-redirect"=false \
+            --set server.ingress.servicePort=443 \
             --wait --timeout 10m
 
           kubectl -n "$(ARGO_NS)" rollout status deploy/argocd-server --timeout=10m
 
           echo "argocd-server args:"
           kubectl -n "$(ARGO_NS)" get deploy argocd-server -o jsonpath='{.spec.template.spec.containers[0].args}' ; echo
+
+          echo "argocd-cm.url:"
+          kubectl -n "$(ARGO_NS)" get cm argocd-cm -o jsonpath='{.data.url}' ; echo
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-        AWS_REGION: $(AWS_REGION)
+        AWS_DEFAULT_REGION: $(AWS_REGION)
 
+    # =========================
+    # Apply root-app.yaml
+    # =========================
     - task: Bash@3
       displayName: "Apply root-app.yaml (platform-manifests)"
       inputs:
@@ -94,8 +201,11 @@ stages:
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-        AWS_REGION: $(AWS_REGION)
+        AWS_DEFAULT_REGION: $(AWS_REGION)
 
+    # =========================
+    # Verify
+    # =========================
     - task: Bash@3
       displayName: "Verify ArgoCD ingress/service"
       inputs:
@@ -103,10 +213,16 @@ stages:
         script: |
           set -euo pipefail
           echo "Ingress in argocd namespace:"
-          kubectl -n "$(ARGO_NS)" get ingress || true
+          kubectl -n "$(ARGO_NS)" get ingress -o wide || true
+
           echo "Service argocd-server:"
           kubectl -n "$(ARGO_NS)" get svc argocd-server -o wide
+
+          echo "Try in-cluster URL checks:"
+          kubectl -n "$(ARGO_NS)" run curlcheck --image=curlimages/curl:8.5.0 --restart=Never --command -- sleep 30 || true
+          kubectl -n "$(ARGO_NS)" exec -i curlcheck -- curl -I -k https://argocd-server/argocd/ || true
+          kubectl -n "$(ARGO_NS)" delete pod curlcheck --ignore-not-found=true
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-        AWS_REGION: $(AWS_REGION)
+        AWS_DEFAULT_REGION: $(AWS_REGION)
