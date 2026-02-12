@@ -11,7 +11,7 @@ spec:
     server: https://kubernetes.default.svc
     namespace: nexus
   source:
-    repoURL: oci://ghcr.io/stevehipwell/helm-charts
+    repoURL: https://stevehipwell.github.io/helm-charts/
     chart: nexus3
     targetRevision: "5.19.0"
     helm:
