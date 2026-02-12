@@ -11,19 +11,15 @@ spec:
     server: https://kubernetes.default.svc
     namespace: nexus
   source:
-    repoURL: https://stevehipwell.github.io/helm-charts/
-    chart: stevehipwell
+    repoURL: oci://ghcr.io/stevehipwell/helm-charts
+    chart: nexus3
     targetRevision: "5.19.0"
     helm:
       values: |
-        nexus:
-          docker:
-            enabled: false
-
         persistence:
           enabled: true
           storageClass: gp3
-          storageSize: 2Gi
+          size: 2Gi
 
         service:
           type: ClusterIP
