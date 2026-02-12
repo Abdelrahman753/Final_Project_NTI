@@ -3,25 +3,39 @@ kind: Application
 metadata:
   name: sonarqube
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default
-
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sonarqube
   source:
     repoURL: https://SonarSource.github.io/helm-chart-sonarqube
     chart: sonarqube
     targetRevision: "10.6.0"
     helm:
       values: |
+        # --- SonarQube persistence on gp3 ---
         persistence:
-          enabled: false
+          enabled: true
+          storageClass: gp3
+          size: 2Gi
 
         service:
           type: ClusterIP
 
+        # --- PostgreSQL persistence on gp3 ---
         postgresql:
           enabled: true
+          image:
+            registry: docker.io
+            repository: bitnami/postgresql
+            tag: 15.5.0-debian-12-r0
           persistence:
-            enabled: false
+            enabled: true
+            storageClass: gp3
+            size: 2Gi
 
         sonarWebContext: /sonar
         sonarProperties:
@@ -29,10 +43,6 @@ spec:
 
         ingress:
           enabled: false
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: sonarqube
-
   syncPolicy:
     automated:
       prune: true

@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: vault
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default
   destination:
@@ -24,38 +26,34 @@ spec:
               config: |
                 ui = true
                 cluster_name = "vault-eks"
+                api_addr = "https://qj6jvlfmgh.execute-api.us-east-1.amazonaws.com/vault"
+
                 listener "tcp" {
                   address = "0.0.0.0:8200"
                   cluster_address = "0.0.0.0:8201"
                   tls_disable = 1
                 }
+
                 storage "raft" {
                   path = "/vault/data"
                 }
+
                 service_registration "kubernetes" {}
 
           dataStorage:
             enabled: true
-            size: 1Gi
+            size: 2Gi
             mountPath: /vault/data
+            storageClass: gp3
 
           ingress:
-            enabled: true
-            ingressClassName: nginx
-            annotations:
-              nginx.ingress.kubernetes.io/ssl-redirect: "false"
-            hosts:
-              - host: ""
-                paths:
-                  - /vault
-            pathType: Prefix
+            enabled: false
 
         ui:
           enabled: true
 
         injector:
           enabled: true
-
   syncPolicy:
     automated:
       prune: true

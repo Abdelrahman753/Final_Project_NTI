@@ -3,36 +3,36 @@ kind: Application
 metadata:
   name: nexus
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default
-
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nexus
   source:
     repoURL: https://sonatype.github.io/helm3-charts/
     chart: nexus-repository-manager
     targetRevision: "64.2.0"
     helm:
       values: |
+        nexus:
+          docker:
+            enabled: false
+
         persistence:
-          enabled: false
+          enabled: true
           storageClass: gp3
-          accessMode: ReadWriteOnce
-          size: 1Gi
+          storageSize: 2Gi
 
         service:
           type: ClusterIP
 
         ingress:
           enabled: false
-
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: nexus
-
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-
-
