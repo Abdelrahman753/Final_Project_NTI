@@ -81,7 +81,6 @@ stages:
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
         AWS_REGION: $(AWS_REGION)
 
-    # Apply root-app (App of Apps)
     - task: Bash@3
       displayName: "Apply root-app.yaml"
       inputs:
